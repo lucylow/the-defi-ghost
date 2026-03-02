@@ -1,12 +1,23 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import GhostNav from "@/components/GhostNav";
+import HeroSection from "@/components/HeroSection";
+import ProblemSolution from "@/components/ProblemSolution";
+import AgentTeam from "@/components/AgentTeam";
+import InteractiveDemo from "@/components/InteractiveDemo";
+import HowItWorks from "@/components/HowItWorks";
+import PoweredBy from "@/components/PoweredBy";
+import GhostFooter from "@/components/GhostFooter";
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <GhostNav />
+      <HeroSection />
+      <ProblemSolution />
+      <AgentTeam />
+      <InteractiveDemo />
+      <HowItWorks />
+      <PoweredBy />
+      <GhostFooter />
     </div>
   );
 };
