@@ -9,7 +9,7 @@ Multi-agent backend for DeFi Ghost: yield discovery, risk assessment, and execut
 - **Risk**: Risk Governor validates opportunities against user profile.
 - **Execution**: Strategy Architect → Transaction Builder → Gas Analyst → Custody Manager.
 
-Memory and identity use local stubs compatible with Ethoswarm (Animoca Minds); swap in real SDK when available. For which **AI models** power each agent (GPT-4/Venice.ai, XGBoost, BERT, RAG), see **[AI_MODELS.md](AI_MODELS.md)**.
+Memory and identity use local stubs compatible with Ethoswarm (Animoca Minds); swap in real SDK when available. For **agent identity** (persona, memory namespace, user context, reputation, on-chain identity), see **[docs/IDENTITY.md](docs/IDENTITY.md)**. For which **AI models** power each agent (GPT-4/Venice.ai, XGBoost, BERT, RAG), see **[AI_MODELS.md](AI_MODELS.md)**.
 
 ## Setup
 
