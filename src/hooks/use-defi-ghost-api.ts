@@ -44,7 +44,7 @@ export function useActivity(refetchInterval: number | false = 3000) {
   return useQuery({
     queryKey: API_KEYS.activity,
     queryFn: getActivity,
-    refetchInterval: refetchInterval > 0 ? refetchInterval : false,
+    refetchInterval: typeof refetchInterval === 'number' && refetchInterval > 0 ? refetchInterval : false,
   });
 }
 
