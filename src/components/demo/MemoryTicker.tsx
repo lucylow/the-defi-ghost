@@ -1,15 +1,22 @@
 import { useEffect, useState } from "react";
-import { memoryItems } from "./demoScenarios";
+import { memoryItems as defaultMemoryItems } from "./demoScenarios";
 
-const MemoryTicker = () => {
+interface MemoryTickerProps {
+  /** When provided (e.g. from API), shows live memory; otherwise demo items. */
+  memoryItems?: string[];
+}
+
+const MemoryTicker = ({ memoryItems: propItems }: MemoryTickerProps) => {
   const [memoryIndex, setMemoryIndex] = useState(0);
+  const memoryItems = propItems?.length ? propItems : defaultMemoryItems;
 
   useEffect(() => {
+    if (memoryItems.length === 0) return;
     const interval = setInterval(() => {
       setMemoryIndex((i) => (i + 1) % memoryItems.length);
     }, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [memoryItems.length]);
 
   return (
     <div
@@ -25,7 +32,7 @@ const MemoryTicker = () => {
             className="text-xs truncate animate-pulse font-mono"
             style={{ color: "hsl(265 80% 65% / 0.8)" }}
           >
-            {memoryItems[memoryIndex]}
+            {memoryItems[memoryIndex] ?? "—"}
           </p>
         </div>
       </div>

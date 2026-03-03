@@ -45,6 +45,19 @@ class MemoryClient:
         # Return last N as "results" (stub)
         return [{"key": m["key"], "value": m["value"], "metadata": m["metadata"]} for m in filtered[-top_k:]]
 
+    async def search_cross_agent(
+        self,
+        query_embedding: List[float],
+        top_k: int = 5,
+        metadata_filter: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Search across all agent namespaces (cross-agent memory). Requires cross-agent permissions."""
+        filtered = self._memories
+        if metadata_filter:
+            for k, v in metadata_filter.items():
+                filtered = [m for m in filtered if m.get("metadata", {}).get(k) == v]
+        return [{"key": m["key"], "value": m["value"], "metadata": m["metadata"]} for m in filtered[-top_k:]]
+
     async def list_recent(
         self,
         namespace: Optional[str] = None,
