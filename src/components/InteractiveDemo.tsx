@@ -5,6 +5,72 @@ import { PRESET_QUERIES, DEMO_FLOWS, initialAgents } from "./demo/demoScenarios"
 import { AgentActivity, Message } from "./demo/types";
 import { useBackendAvailable, useSendMessage, useSessionMessages, useActivity, useMemory } from "@/hooks/use-defi-ghost-api";
 import type { AgentActivityItem as ApiActivity } from "@/lib/api-types";
+import { useToast } from "@/hooks/use-toast";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+
+async function streamGhostChat(
+  messages: { role: string; content: string }[],
+  onDelta: (chunk: string) => void,
+  onDone: () => void,
+  onError: (msg: string) => void
+) {
+  let resp: Response;
+  try {
+    resp = await fetch(`${SUPABASE_URL}/functions/v1/ghost-chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify({ messages }),
+    });
+  } catch {
+    onError("Could not reach Ghost. Check your connection.");
+    return;
+  }
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ error: "Request failed" }));
+    if (resp.status === 429) onError("Rate limit reached. Please wait a moment.");
+    else if (resp.status === 402) onError("AI credits exhausted. Add credits in workspace settings.");
+    else onError(err.error ?? "Ghost is unavailable right now.");
+    return;
+  }
+
+  if (!resp.body) { onError("Empty response"); return; }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let textBuffer = "";
+  let streamDone = false;
+
+  while (!streamDone) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    textBuffer += decoder.decode(value, { stream: true });
+
+    let newlineIndex: number;
+    while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+      let line = textBuffer.slice(0, newlineIndex);
+      textBuffer = textBuffer.slice(newlineIndex + 1);
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (line.startsWith(":") || line.trim() === "") continue;
+      if (!line.startsWith("data: ")) continue;
+      const jsonStr = line.slice(6).trim();
+      if (jsonStr === "[DONE]") { streamDone = true; break; }
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+        if (content) onDelta(content);
+      } catch {
+        textBuffer = line + "\n" + textBuffer;
+        break;
+      }
+    }
+  }
+  onDone();
+}
 
 const formatMessage = (text: string) =>
   text.split("\n").map((line, i) => {
@@ -46,6 +112,7 @@ function activitiesToAgentFeed(activities: ApiActivity[]): AgentActivity[] {
 }
 
 const InteractiveDemo = () => {
+  const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "agent",
@@ -58,6 +125,9 @@ const InteractiveDemo = () => {
   const [approved, setApproved] = useState(false);
   const [showApprove, setShowApprove] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [inputValue, setInputValue] = useState("");
+  const [aiHistory, setAiHistory] = useState<{ role: string; content: string }[]>([]);
+  const [isAiStreaming, setIsAiStreaming] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -107,7 +177,97 @@ const InteractiveDemo = () => {
     setAgents(activitiesToAgentFeed(activityData.activities));
   }, [isLiveMode, activityData?.activities]);
 
+  const sendAiMessage = async (text: string) => {
+    if (isAiStreaming || !text.trim()) return;
+    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    // Add user message
+    setMessages((prev) => [...prev, { role: "user", text, timestamp: now }]);
+    const newHistory = [...aiHistory, { role: "user", content: text }];
+    setAiHistory(newHistory);
+    setIsAiStreaming(true);
+    setShowApprove(false);
+    setApproved(false);
+    scrollToBottom();
+
+    // Animate agents as "thinking"
+    setAgents(initialAgents.map((a) => ({ ...a, status: "waiting" as const })));
+    setTimeout(() => {
+      setAgents((prev) => prev.map((a, i) => i === 0 ? { ...a, status: "active" as const, message: "Coordinating agents..." } : a));
+    }, 300);
+    setTimeout(() => {
+      setAgents((prev) => prev.map((a, i) => i === 3 ? { ...a, status: "active" as const, message: "Scanning protocols..." } : a));
+    }, 800);
+    setTimeout(() => {
+      setAgents((prev) => prev.map((a, i) => [1, 2].includes(i) ? { ...a, status: "active" as const, message: "Analyzing market data..." } : a));
+    }, 1200);
+
+    // Add a placeholder for streaming
+    const streamTs = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    setMessages((prev) => [...prev, { role: "agent", text: "▋", timestamp: streamTs }]);
+    scrollToBottom();
+
+    let accumulated = "";
+    await streamGhostChat(
+      newHistory,
+      (chunk) => {
+        accumulated += chunk;
+        setMessages((prev) => {
+          const next = [...prev];
+          const lastIdx = next.length - 1;
+          if (next[lastIdx]?.role === "agent") {
+            next[lastIdx] = { ...next[lastIdx], text: accumulated + "▋" };
+          }
+          return next;
+        });
+        scrollToBottom();
+      },
+      () => {
+        // Finalize
+        setMessages((prev) => {
+          const next = [...prev];
+          const lastIdx = next.length - 1;
+          if (next[lastIdx]?.role === "agent") {
+            next[lastIdx] = { ...next[lastIdx], text: accumulated };
+          }
+          return next;
+        });
+        const updatedHistory = [...newHistory, { role: "assistant", content: accumulated }];
+        setAiHistory(updatedHistory);
+        setIsAiStreaming(false);
+        if (accumulated.toLowerCase().includes("shall i prepare") || accumulated.toLowerCase().includes("approve")) {
+          setShowApprove(true);
+        }
+        setAgents(initialAgents.map((a, i) => ({
+          ...a,
+          status: i === 0 ? "done" as const : "waiting" as const,
+          message: i === 0 ? "Analysis complete ✅" : a.message,
+        })));
+        scrollToBottom();
+      },
+      (errMsg) => {
+        setIsAiStreaming(false);
+        setMessages((prev) => {
+          const next = [...prev];
+          const lastIdx = next.length - 1;
+          if (next[lastIdx]?.role === "agent" && next[lastIdx].text === "▋") {
+            next.splice(lastIdx, 1);
+          }
+          return next;
+        });
+        toast({ title: "Ghost Error", description: errMsg, variant: "destructive" });
+        setAgents(initialAgents);
+      }
+    );
+  };
+
   const runQuery = (query: string) => {
+    // If AI is available (Supabase connected), use real AI
+    if (SUPABASE_URL) {
+      sendAiMessage(query);
+      return;
+    }
+
     if (isRunning) return;
 
     const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -169,6 +329,11 @@ const InteractiveDemo = () => {
     const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     setMessages((prev) => [...prev, { role: "user", text: "Approve ✅", timestamp: ts }]);
 
+    if (SUPABASE_URL) {
+      sendAiMessage("APPROVE — prepare and describe the transaction steps.");
+      return;
+    }
+
     if (isLiveMode) {
       runQuery("Approve");
       setAgents((prev) =>
@@ -209,6 +374,16 @@ const InteractiveDemo = () => {
       })
     : undefined;
 
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (inputValue.trim()) {
+        runQuery(inputValue.trim());
+        setInputValue("");
+      }
+    }
+  };
+
   return (
     <section className="py-24 px-6" id="demo">
       <div className="container mx-auto max-w-7xl">
@@ -217,9 +392,11 @@ const InteractiveDemo = () => {
             <span className="glow-text">Talk to</span> the Ghost
           </h2>
           <p className="text-lg" style={{ color: "hsl(var(--muted-foreground))" }}>
-            {isLiveMode
+            {SUPABASE_URL
+              ? "Powered by real AI. Type anything or try a preset query — Ghost will coordinate all 9 agents."
+              : isLiveMode
               ? "Connected to the multi-agent backend. Ask about yields, risk, or strategies."
-              : "Experience the multi-agent system in action. Try a query below. (Start the API for live mode.)"}
+              : "Experience the multi-agent system in action. Try a query below."}
           </p>
         </div>
 
@@ -232,8 +409,8 @@ const InteractiveDemo = () => {
             <div>
               <div className="font-bold">Ghost Supervisor</div>
               <div className="flex items-center gap-2 text-sm" style={{ color: "hsl(var(--muted-foreground))" }}>
-                <span className={`status-dot ${isLiveMode ? "done" : ""}`} />
-                <span>{isLiveMode ? "Live — 9 agents active" : "9 agents active"}</span>
+                <span className={`status-dot ${SUPABASE_URL || isLiveMode ? "done" : ""}`} />
+                <span>{SUPABASE_URL ? "AI-powered — 9 agents ready" : isLiveMode ? "Live — 9 agents active" : "9 agents active"}</span>
               </div>
             </div>
             <div className="ml-auto flex gap-2">
@@ -284,16 +461,41 @@ const InteractiveDemo = () => {
                 <div ref={chatEndRef} />
               </div>
 
-              <div className="p-4 border-t" style={{ borderColor: "hsl(var(--ghost-border))" }}>
-                <p className="text-xs mb-3 font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>
-                  Try a query:
+              <div className="p-4 border-t space-y-3" style={{ borderColor: "hsl(var(--ghost-border))" }}>
+                {/* Text input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleInputKeyDown}
+                    placeholder="Ask Ghost anything about DeFi..."
+                    disabled={isAiStreaming || isRunning}
+                    className="flex-1 px-3 py-2 rounded-xl text-sm bg-transparent outline-none disabled:opacity-50"
+                    style={{
+                      background: "hsl(var(--secondary))",
+                      border: "1px solid hsl(var(--ghost-border))",
+                      color: "hsl(var(--foreground))",
+                    }}
+                  />
+                  <button
+                    onClick={() => { if (inputValue.trim()) { runQuery(inputValue.trim()); setInputValue(""); } }}
+                    disabled={isAiStreaming || isRunning || !inputValue.trim()}
+                    className="btn-ghost-primary px-4 py-2 rounded-xl text-sm disabled:opacity-50"
+                  >
+                    {isAiStreaming ? "..." : "Send"}
+                  </button>
+                </div>
+
+                <p className="text-xs font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>
+                  Quick queries:
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {PRESET_QUERIES.map((q) => (
                     <button
                       key={q}
                       onClick={() => runQuery(q)}
-                      disabled={isRunning}
+                      disabled={isAiStreaming || isRunning}
                       className="text-xs px-3 py-1.5 rounded-full transition-all disabled:opacity-50"
                       style={{
                         background: "hsl(var(--ghost-cyan) / 0.1)",
