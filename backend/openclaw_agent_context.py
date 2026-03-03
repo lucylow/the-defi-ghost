@@ -30,6 +30,7 @@ class Message:
     recipient: str
     type: str
     payload: Dict[str, Any]
+    header: Optional[Dict[str, Any]] = None  # identity: sender_id, sender_role, sender_persona, timestamp
 
 
 class Mailbox:
@@ -61,7 +62,13 @@ class Mailbox:
                 continue
             if aid in _agent_queues:
                 await _agent_queues[aid].put(
-                    Message(sender=self._agent_id, recipient=aid, type=message_type, payload=payload)
+                    Message(
+                        sender=self._agent_id,
+                        recipient=aid,
+                        type=message_type,
+                        payload=payload,
+                        header=None,
+                    )
                 )
 
     async def listen(self) -> AsyncIterator[Message]:

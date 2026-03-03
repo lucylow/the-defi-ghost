@@ -94,12 +94,19 @@ class DeFiGhostAgent(ABC):
     # -------------------- Communication --------------------
 
     async def send_message(self, recipient: str, message_type: str, payload: Dict[str, Any]) -> None:
-        """Send a direct message to another agent."""
+        """Send a direct message to another agent (header carries identity for recipient)."""
+        persona = getattr(self, "persona", None)
         msg = Message(
             sender=self.agent_id,
             recipient=recipient,
             type=message_type,
             payload=payload,
+            header={
+                "sender_id": self.agent_id,
+                "sender_role": self.role,
+                "sender_persona": getattr(persona, "name", None) or getattr(persona, "role", self.role),
+                "timestamp": datetime.utcnow().isoformat(),
+            },
         )
         await self.context.mailbox.send(msg)
         await self._log_activity(f"Sent {message_type} to {recipient}")
@@ -189,6 +196,17 @@ class DeFiGhostAgent(ABC):
                 metadata_filter=metadata_filter,
             )
         return results
+
+    async def on_set_user_context(self, payload: Dict[str, Any]) -> None:
+        """Set current user context (called when Supervisor broadcasts set_user_context)."""
+        self.current_user_id = payload.get("user_id")
+        self.user_profile = payload.get("profile") or {}
+        self.user_context_memories = []
+        if self.current_user_id:
+            self.user_context_memories = await self.recall_memory(
+                query=f"user_{self.current_user_id}_interactions",
+                top_k=10,
+            )
 
     async def recall_relevant_memories(
         self,

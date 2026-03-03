@@ -168,7 +168,19 @@ graph LR
     Mem --> Execution
 ```
 
+<<<<<<< Updated upstream
 ---
+=======
+## Lovable compatibility
+
+This project is set up to work with [Lovable](https://lovable.dev):
+
+- **Build**: Standard Vite + React; `npm run build` produces static assets. The `lovable-tagger` plugin runs in development only so production builds stay clean.
+- **Base path**: Set `VITE_BASE` (e.g. `/app/`) in your environment if the app is served from a subpath.
+- **Backend API**: Set `VITE_API_BASE` to your backend URL when deploying the frontend separately (e.g. `https://api.example.com`). If unset, the app uses relative `/api` (works with the dev proxy or same-origin backend). The UI degrades to a demo mode when the backend is unreachable.
+
+## How can I deploy this project?
+>>>>>>> Stashed changes
 
 ## Memory & Cognition
 

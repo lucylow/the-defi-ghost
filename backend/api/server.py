@@ -25,7 +25,6 @@ from openclaw_agent_context import (
     Channel,
     _agent_queues,
     _activity_log,
-    append_activity,
 )
 from api.schemas import (
     SendMessageRequest,

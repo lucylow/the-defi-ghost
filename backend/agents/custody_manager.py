@@ -20,6 +20,27 @@ class CustodyManagerAgent(DeFiGhostAgent):
     def __init__(self, config: AgentConfig):
         super().__init__(config)
         self.user_keys: Dict[str, str] = {}
+        self.wallet_address: Optional[str] = None  # on-chain identity (Safe or EOA) for agent-user pair
+
+    async def initialize_onchain_identity(self, user_id: str) -> Optional[str]:
+        """Initialize or resolve on-chain identity (e.g. Safe) for this agent-user pair. Returns wallet address."""
+        # Stub: in production, deploy Safe with owners=[user_main_address, self.agent_address], or use existing
+        existing = await self.recall_memory(
+            query=f"user_{user_id}_wallet",
+            top_k=1,
+            metadata_filter={"user_id": user_id},
+        )
+        if existing and isinstance(existing[0].get("value"), str):
+            self.wallet_address = existing[0]["value"]
+            return self.wallet_address
+        # Placeholder address; replace with Safe.create(...) when web3 stack is ready
+        self.wallet_address = "0x0000000000000000000000000000000000000000"
+        await self.store_memory(
+            key=f"user_{user_id}_wallet",
+            value=self.wallet_address,
+            metadata={"user_id": user_id},
+        )
+        return self.wallet_address
 
     async def handle_message(self, message: Message) -> None:
         if message.type == "execute_txs":

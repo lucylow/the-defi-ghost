@@ -83,6 +83,10 @@ const InteractiveDemo = () => {
   // Merge agent replies from API into messages (agent role only; user messages stay local)
   useEffect(() => {
     if (!sessionId || !sessionData?.messages?.length) return;
+    const hasApprovePrompt = sessionData.messages.some(
+      (m) => m.text.includes("Shall I prepare") || m.text.includes("APPROVE")
+    );
+    if (hasApprovePrompt) setShowApprove(true);
     setMessages((prev) => {
       const agentTexts = new Set(prev.filter((m) => m.role === "agent").map((m) => m.text));
       const newAgentMessages = sessionData.messages.filter((m) => !agentTexts.has(m.text));
@@ -91,7 +95,6 @@ const InteractiveDemo = () => {
       for (const m of newAgentMessages) {
         const ts = m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
         next.push({ role: "agent" as const, text: m.text, timestamp: ts || "Just now" });
-        if (m.text.includes("Shall I prepare") || m.text.includes("APPROVE")) setShowApprove(true);
       }
       return next;
     });

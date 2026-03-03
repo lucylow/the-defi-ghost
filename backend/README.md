@@ -49,6 +49,19 @@ Memory and identity use local stubs compatible with Ethoswarm (Animoca Minds); s
   python test_client.py "Find best yield for 5000 USDC"
   ```
 
+- **Run the HTTP API** (dashboard + agents in one process)
+  ```bash
+  # From repo root (recommended)
+  cd path/to/the-defi-ghost
+  pip install -r backend/requirements.txt
+  uvicorn backend.api.server:app --reload --host 0.0.0.0 --port 8000
+
+  # Or from backend dir
+  cd backend
+  uvicorn api.server:app --reload --host 0.0.0.0 --port 8000
+  ```
+  Then open the frontend (e.g. `npm run dev` on port 8080). The app will use the proxy to `/api` and show **Live** mode: chat, agent activity feed, and memory map from the real backend.
+
 ## OpenClaw Gateway (alternative)
 
 To run DeFi Ghost with the **OpenClaw Gateway** (Telegram, sessions, agent-to-agent tools like `sessions_send`), use the config and session definitions in the repo’s **openclaw/** folder. See **[../openclaw/README.md](../openclaw/README.md)** for:
@@ -64,9 +77,12 @@ You can use the gateway as the only front-end (LLM-only agents) or combine it wi
 
 ```
 backend/
-  config.py              # Settings (env)
+  api/
+    server.py             # FastAPI: /api/chat, /api/session/:id/messages, /api/activity, /api/memory
+    schemas.py            # Request/response models
+  config.py               # Settings (env)
   base_agent.py           # Base agent + LLM/memory/mailbox
-  openclaw_agent_context.py  # Mailbox/Message/Channel (in-process)
+  openclaw_agent_context.py  # Mailbox/Message/Channel (in-process) + activity log for dashboard
   ethoswarm_sdk/          # Stub for Ethoswarm memory/identity
   agents/
     supervisor.py

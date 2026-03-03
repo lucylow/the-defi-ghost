@@ -120,7 +120,7 @@ class SupervisorAgent(DeFiGhostAgent):
         return result
 
     async def _handle_yield_query(self, user_id: str, intent: Dict[str, Any], channel: str) -> None:
-        """Initiate yield analysis workflow."""
+        """Initiate yield analysis workflow. Injects user context so specialist agents can personalize."""
         task_id = str(uuid.uuid4())
         self.active_tasks[task_id] = {
             "task_id": task_id,
@@ -138,6 +138,10 @@ class SupervisorAgent(DeFiGhostAgent):
             "DeFi Ghost is analyzing yields. I'll gather the team...",
             channel,
         )
+
+        # Identity: set user context so specialist agents (e.g. Market Analyst) can personalize
+        user_profile = await self.get_user_profile(user_id)
+        await self.broadcast("set_user_context", {"user_id": user_id, "profile": user_profile})
 
         await self.broadcast(
             "analyze_yield",
@@ -244,6 +248,7 @@ Reply with *APPROVE* to execute, *MODIFY* to change parameters, or *REJECT*.
             if isinstance(val, dict):
                 return val
         return {
+            "risk_tolerance": 5,
             "max_risk": 5,
             "preferred_protocols": [],
             "blacklisted_protocols": [],
@@ -362,6 +367,10 @@ Reply with *APPROVE* to execute, *MODIFY* to change parameters, or *REJECT*.
         await self._update_agent_reputation(outcome.get("success", False))
 
     async def _update_agent_reputation(self, success: bool) -> None:
-        """Update contributing agents' reputation based on outcome (stub for future)."""
-        # In full implementation: recall decision metadata, update per-agent scores
-        self.logger.info(f"Reputation update (outcome={'success' if success else 'failure'})")
+        """Update contributing agents' reputation via Memory Curator (identity spec)."""
+        outcome = "success" if success else "failure"
+        self.logger.info(f"Reputation update (outcome={outcome})")
+        await self.send_message("memory_curator_001", "update_reputation", {
+            "agent_id": self.agent_id,
+            "outcome": outcome,
+        })
