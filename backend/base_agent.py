@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel
 
-from openclaw_agent_context import AgentContext, Message
+from openclaw_agent_context import AgentContext, Message, append_activity
 from ethoswarm_sdk import MemoryClient, IdentityClient
 from ethoswarm_sdk.identity import Persona
 import redis.asyncio as redis
@@ -50,10 +50,11 @@ class DeFiGhostAgent(ABC):
             api_key=settings.OPENCLAW_API_KEY,
         )
 
-        # Ethoswarm clients
+        # Ethoswarm clients (Animoca Minds identity)
         self.identity = IdentityClient(
             api_key=settings.ETHOSWARM_API_KEY,
             agent_id=self.agent_id,
+            role=self.role,
         )
         self.memory = MemoryClient(
             api_key=settings.ETHOSWARM_API_KEY,
@@ -72,6 +73,12 @@ class DeFiGhostAgent(ABC):
                 )
             )
 
+        # Dedicated vector namespace for this agent's long-term memories (Ethoswarm)
+        self.memory_namespace = f"agent_{self.agent_id}_memories"
+        # User context (set by Supervisor via set_user_context for specialist agents)
+        self.current_user_id: Optional[str] = None
+        self.user_profile: Optional[Dict[str, Any]] = None
+        self.user_context_memories: List[Dict[str, Any]] = []
         # Redis for short-term working memory (optional: catch if Redis not running)
         try:
             self.redis = redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -116,7 +123,7 @@ class DeFiGhostAgent(ABC):
         await self.context.channel.send(
             channel_type=channel,
             recipient=user_id,
-            message={"text": text},
+            message={"text": text, "timestamp": datetime.utcnow().isoformat()},
         )
 
     # -------------------- Memory Operations --------------------
@@ -133,7 +140,7 @@ class DeFiGhostAgent(ABC):
         memory_type: episodic | semantic | procedural | user_specific (for RAG filtering).
         """
         if namespace is None:
-            namespace = f"agent_{self.agent_id}"
+            namespace = self.memory_namespace
 
         # Generate embedding for semantic search
         text_value = json.dumps(value) if not isinstance(value, str) else value
@@ -162,16 +169,25 @@ class DeFiGhostAgent(ABC):
         top_k: int = 5,
         namespace: Optional[str] = None,
         metadata_filter: Optional[Dict] = None,
+        include_other_agents: bool = False,
     ) -> List[Dict[str, Any]]:
-        """Retrieve relevant memories using semantic search."""
+        """Retrieve relevant memories. If include_other_agents, search across all agent namespaces (cross-agent)."""
         query_embedding = self.embedder.encode(query).tolist() if self.embedder else []
-
-        results = await self.memory.search(
-            query_embedding=query_embedding,
-            top_k=top_k,
-            namespace=namespace,
-            metadata_filter=metadata_filter,
-        )
+        if include_other_agents:
+            results = await self.memory.search_cross_agent(
+                query_embedding=query_embedding,
+                top_k=top_k,
+                metadata_filter=metadata_filter,
+            )
+        else:
+            if namespace is None:
+                namespace = self.memory_namespace
+            results = await self.memory.search(
+                query_embedding=query_embedding,
+                top_k=top_k,
+                namespace=namespace,
+                metadata_filter=metadata_filter,
+            )
         return results
 
     async def recall_relevant_memories(
@@ -208,7 +224,7 @@ class DeFiGhostAgent(ABC):
     ) -> None:
         """Summarize recent memories and optionally archive/delete old raw memories."""
         if namespace is None:
-            namespace = f"agent_{self.agent_id}"
+            namespace = self.memory_namespace
         recent = await self.memory.list_recent(namespace=namespace, days=days)
         if not recent:
             return
@@ -329,13 +345,14 @@ class DeFiGhostAgent(ABC):
     # -------------------- Activity Logging --------------------
 
     async def _log_activity(self, message: str) -> None:
-        """Log agent activity for monitoring."""
+        """Log agent activity for monitoring (in-memory log + optional Redis)."""
         activity = {
             "agent_id": self.agent_id,
             "role": self.role,
             "message": message,
             "timestamp": datetime.utcnow().isoformat(),
         }
+        append_activity(activity)
         if self.redis:
             await self.redis.lpush("agent_activity", json.dumps(activity))
             await self.redis.ltrim("agent_activity", 0, 99)

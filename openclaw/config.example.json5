@@ -1,0 +1,82 @@
+// DeFi Ghost – OpenClaw Gateway configuration example
+// Copy to ~/.openclaw/openclaw.json and fill in secrets (botToken, API keys).
+// See openclaw/README.md for setup steps.
+
+{
+  gateway: {
+    bind: "loopback",
+    port: 18789,
+    // Optional: expose to tailnet only (no public access)
+    // tailscale: { mode: "serve" },
+  },
+
+  // Telegram: use pairing for beta so only approved users can message the bot
+  channels: {
+    telegram: {
+      enabled: true,
+      botToken: "${TELEGRAM_BOT_TOKEN}",
+      dmPolicy: "pairing",
+      // allowFrom: ["tg:123456789"],
+      groups: { "*": { requireMention: true } },
+    },
+  },
+
+  // Models – primary used by agents
+  agents: {
+    defaults: {
+      workspace: "~/.openclaw/workspace",
+      model: {
+        primary: "openai/gpt-4-turbo-preview",
+        fallbacks: ["openai/gpt-4o"],
+      },
+      models: {
+        "openai/gpt-4-turbo-preview": { alias: "gpt-4-turbo" },
+        "openai/gpt-4o": { alias: "gpt-4o" },
+      },
+    },
+    list: [
+      {
+        id: "defighost-supervisor",
+        default: true,
+        workspace: "~/.openclaw/workspace-defighost-supervisor",
+        tools: { profile: "messaging", allow: ["group:sessions"] },
+        groupChat: { mentionPatterns: ["@defighost", "DeFi Ghost", "defighost"] },
+      },
+      {
+        id: "defighost-scout",
+        workspace: "~/.openclaw/workspace-defighost-scout",
+        tools: { profile: "messaging", allow: ["fetch-defi-apy", "group:sessions"] },
+      },
+      {
+        id: "defighost-analyst-bull",
+        workspace: "~/.openclaw/workspace-defighost-analyst-bull",
+        tools: { profile: "messaging", allow: ["group:sessions"] },
+      },
+      {
+        id: "defighost-analyst-bear",
+        workspace: "~/.openclaw/workspace-defighost-analyst-bear",
+        tools: { profile: "messaging", allow: ["group:sessions"] },
+      },
+      {
+        id: "defighost-risk",
+        workspace: "~/.openclaw/workspace-defighost-risk",
+        tools: { profile: "messaging", allow: ["group:sessions"] },
+      },
+      {
+        id: "defighost-executor",
+        workspace: "~/.openclaw/workspace-defighost-executor",
+        tools: { profile: "messaging", allow: ["group:sessions"] },
+      },
+    ],
+  },
+
+  // Route Telegram DMs to the supervisor agent (default)
+  bindings: [
+    { agentId: "defighost-supervisor", match: { channel: "telegram" } },
+  ],
+
+  session: {
+    dmScope: "main",
+    reset: { mode: "daily", atHour: 4, idleMinutes: 120 },
+  },
+}

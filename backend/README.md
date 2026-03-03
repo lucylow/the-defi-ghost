@@ -49,6 +49,17 @@ Memory and identity use local stubs compatible with Ethoswarm (Animoca Minds); s
   python test_client.py "Find best yield for 5000 USDC"
   ```
 
+## OpenClaw Gateway (alternative)
+
+To run DeFi Ghost with the **OpenClaw Gateway** (Telegram, sessions, agent-to-agent tools like `sessions_send`), use the config and session definitions in the repo’s **openclaw/** folder. See **[../openclaw/README.md](../openclaw/README.md)** for:
+
+- Installing OpenClaw and starting the gateway
+- Configuring Telegram (with pairing for security) and models
+- Setting up the DeFi Ghost agents (supervisor, scout, analysts, risk, executor) and the **fetch-defi-apy** skill
+- End-to-end flow and security (Tailscale, tool permissions)
+
+You can use the gateway as the only front-end (LLM-only agents) or combine it with this Python backend (e.g. executor calling the backend for strategy/execution).
+
 ## Project layout
 
 ```

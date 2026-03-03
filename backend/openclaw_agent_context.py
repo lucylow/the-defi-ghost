@@ -14,6 +14,10 @@ _agent_queues: Dict[str, asyncio.Queue] = {}
 _broadcast_queues: List[asyncio.Queue] = []
 _team_agents: Dict[str, List[str]] = {}  # team_id -> [agent_id, ...]
 
+# In-memory activity log for dashboard (last 100 entries); also written to Redis when available
+_activity_log: List[Dict[str, Any]] = []
+_ACTIVITY_LOG_MAX = 100
+
 
 class ChannelType:
     telegram = "telegram"
@@ -69,10 +73,16 @@ class Mailbox:
             yield msg
 
 
-class Channel:
-    """User-facing channel (e.g. Telegram). Stub: stores last message per user for testing."""
+def append_activity(activity: Dict[str, Any]) -> None:
+    """Append to global activity log for dashboard API (thread-safe enough for single process)."""
+    global _activity_log
+    _activity_log = ([activity] + _activity_log)[:_ACTIVITY_LOG_MAX]
 
-    _outbox: Dict[str, List[Dict]] = {}  # user_id -> [messages]
+
+class Channel:
+    """User-facing channel (e.g. Telegram, dashboard). Stub: stores messages per user for testing/API."""
+
+    _outbox: Dict[str, List[Dict]] = {}  # key = f"{channel_type}:{recipient}" -> [messages]
 
     async def send(
         self,

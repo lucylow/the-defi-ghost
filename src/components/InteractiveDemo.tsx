@@ -1,8 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import AgentActivityFeed from "./demo/AgentActivityFeed";
 import MemoryTicker from "./demo/MemoryTicker";
 import { PRESET_QUERIES, DEMO_FLOWS, initialAgents } from "./demo/demoScenarios";
 import { AgentActivity, Message } from "./demo/types";
+import { useBackendAvailable, useSendMessage, useSessionMessages, useActivity, useMemory } from "@/hooks/use-defi-ghost-api";
+import type { AgentActivityItem as ApiActivity } from "@/lib/api-types";
 
 const formatMessage = (text: string) =>
   text.split("\n").map((line, i) => {
@@ -16,6 +18,33 @@ const formatMessage = (text: string) =>
     );
   });
 
+/** Map backend role/agent_id to display slot index (0–5) and status. */
+function activitiesToAgentFeed(activities: ApiActivity[]): AgentActivity[] {
+  const roleToSlot: Record<string, number> = {
+    supervisor: 0,
+    market_analyst_bull: 1,
+    market_analyst_bear: 2,
+    opportunity_scout: 3,
+    gas_analyst: 4,
+    risk_governor: 5,
+  };
+  const slotToLatest: Record<number, { message: string }> = {};
+  for (const a of activities.slice(0, 50)) {
+    const role = (a.role || a.agent_id || "").replace(/_001$/, "").toLowerCase();
+    const slot = roleToSlot[role];
+    if (slot !== undefined && !slotToLatest[slot]) {
+      slotToLatest[slot] = { message: a.message };
+    }
+  }
+  return initialAgents.map((base, i) => {
+    const latest = slotToLatest[i];
+    if (latest) {
+      return { ...base, status: "active" as const, message: latest.message };
+    }
+    return { ...base, status: "waiting" as const, message: base.message };
+  });
+}
+
 const InteractiveDemo = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -28,8 +57,20 @@ const InteractiveDemo = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [approved, setApproved] = useState(false);
   const [showApprove, setShowApprove] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const { data: backendAvailable } = useBackendAvailable();
+  const sendMessageMutation = useSendMessage();
+  const { data: sessionData } = useSessionMessages(sessionId, {
+    enabled: Boolean(sessionId) && backendAvailable === true,
+    refetchInterval: 2000,
+  });
+  const { data: activityData } = useActivity(backendAvailable ? 2000 : 0);
+  const { data: memoryData } = useMemory(backendAvailable ? 10_000 : 0);
+
+  const isLiveMode = backendAvailable === true;
 
   const clearTimeouts = () => {
     timeoutsRef.current.forEach(clearTimeout);
@@ -39,17 +80,63 @@ const InteractiveDemo = () => {
   const scrollToBottom = () =>
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
 
+  // Merge agent replies from API into messages (agent role only; user messages stay local)
+  useEffect(() => {
+    if (!sessionId || !sessionData?.messages?.length) return;
+    setMessages((prev) => {
+      const agentTexts = new Set(prev.filter((m) => m.role === "agent").map((m) => m.text));
+      const newAgentMessages = sessionData.messages.filter((m) => !agentTexts.has(m.text));
+      if (newAgentMessages.length === 0) return prev;
+      const next = [...prev];
+      for (const m of newAgentMessages) {
+        const ts = m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+        next.push({ role: "agent" as const, text: m.text, timestamp: ts || "Just now" });
+        if (m.text.includes("Shall I prepare") || m.text.includes("APPROVE")) setShowApprove(true);
+      }
+      return next;
+    });
+    scrollToBottom();
+  }, [sessionId, sessionData?.messages]);
+
+  // Live agent activity feed from API
+  useEffect(() => {
+    if (!isLiveMode || !activityData?.activities?.length) return;
+    setAgents(activitiesToAgentFeed(activityData.activities));
+  }, [isLiveMode, activityData?.activities]);
+
   const runQuery = (query: string) => {
     if (isRunning) return;
+
+    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    setMessages((prev) => [...prev, { role: "user", text: query, timestamp: now }]);
+    scrollToBottom();
+
+    if (isLiveMode) {
+      setIsRunning(true);
+      setShowApprove(false);
+      setApproved(false);
+      setAgents(initialAgents.map((a) => ({ ...a, status: "waiting" as const, message: a.message })));
+      sendMessageMutation.mutate(
+        { text: query },
+        {
+          onSuccess: (data) => {
+            setSessionId(data.session_id);
+          },
+          onSettled: () => {
+            setTimeout(() => setIsRunning(false), 30000);
+          },
+        }
+      );
+      return;
+    }
+
+    // Demo mode: simulated flow
     setIsRunning(true);
     setShowApprove(false);
     setApproved(false);
     clearTimeouts();
 
     const flow = DEMO_FLOWS[query] ?? DEMO_FLOWS["Find me the best yield for 5,000 USDC"];
-    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-    setMessages((prev) => [...prev, { role: "user", text: query, timestamp: now }]);
     setAgents(initialAgents.map((a) => ({ ...a, status: "waiting" })));
 
     flow.agents.forEach(({ delay, index, status, message }) => {
@@ -79,14 +166,22 @@ const InteractiveDemo = () => {
     const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     setMessages((prev) => [...prev, { role: "user", text: "Approve ✅", timestamp: ts }]);
 
-    setAgents((prev) =>
-      prev.map((a, i) =>
-        i === 0
-          ? { ...a, status: "active", message: "Planning bridge + deposit..." }
-          : a
-      )
-    );
+    if (isLiveMode) {
+      runQuery("Approve");
+      setAgents((prev) =>
+        prev.map((a, i) => (i === 0 ? { ...a, status: "active", message: "Planning bridge + deposit..." } : a))
+      );
+      setTimeout(() => {
+        setAgents((prev) =>
+          prev.map((a, i) => (i === 0 ? { ...a, status: "done", message: "Strategy plan complete ✅" } : a))
+        );
+      }, 2500);
+      return;
+    }
 
+    setAgents((prev) =>
+      prev.map((a, i) => (i === 0 ? { ...a, status: "active", message: "Planning bridge + deposit..." } : a))
+    );
     setTimeout(() => {
       const ts2 = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       setMessages((prev) => [
@@ -104,6 +199,13 @@ const InteractiveDemo = () => {
     }, 2500);
   };
 
+  const memoryItemsForTicker = isLiveMode && memoryData?.items?.length
+    ? memoryData.items.map((m) => {
+        const v = typeof m.value === "string" ? m.value : JSON.stringify(m.value);
+        return v.length > 60 ? v.slice(0, 57) + "..." : v;
+      })
+    : undefined;
+
   return (
     <section className="py-24 px-6" id="demo">
       <div className="container mx-auto max-w-7xl">
@@ -112,12 +214,13 @@ const InteractiveDemo = () => {
             <span className="glow-text">Talk to</span> the Ghost
           </h2>
           <p className="text-lg" style={{ color: "hsl(var(--muted-foreground))" }}>
-            Experience the multi-agent system in action. Try a query below.
+            {isLiveMode
+              ? "Connected to the multi-agent backend. Ask about yields, risk, or strategies."
+              : "Experience the multi-agent system in action. Try a query below. (Start the API for live mode.)"}
           </p>
         </div>
 
         <div className="ghost-card rounded-2xl overflow-hidden" style={{ minHeight: "600px" }}>
-          {/* Header */}
           <div
             className="flex items-center gap-3 px-6 py-4 border-b"
             style={{ borderColor: "hsl(var(--ghost-border))", background: "hsl(var(--ghost-card))" }}
@@ -126,8 +229,8 @@ const InteractiveDemo = () => {
             <div>
               <div className="font-bold">Ghost Supervisor</div>
               <div className="flex items-center gap-2 text-sm" style={{ color: "hsl(var(--muted-foreground))" }}>
-                <span className="status-dot" />
-                <span>9 agents active</span>
+                <span className={`status-dot ${isLiveMode ? "done" : ""}`} />
+                <span>{isLiveMode ? "Live — 9 agents active" : "9 agents active"}</span>
               </div>
             </div>
             <div className="ml-auto flex gap-2">
@@ -138,7 +241,6 @@ const InteractiveDemo = () => {
           </div>
 
           <div className="grid lg:grid-cols-2 divide-x" style={{ borderColor: "hsl(var(--ghost-border))" }}>
-            {/* Chat panel */}
             <div className="flex flex-col" style={{ height: "520px" }}>
               <div className="flex-1 overflow-y-auto p-5 space-y-4">
                 {messages.map((msg, i) => (
@@ -179,7 +281,6 @@ const InteractiveDemo = () => {
                 <div ref={chatEndRef} />
               </div>
 
-              {/* Preset queries */}
               <div className="p-4 border-t" style={{ borderColor: "hsl(var(--ghost-border))" }}>
                 <p className="text-xs mb-3 font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>
                   Try a query:
@@ -204,13 +305,12 @@ const InteractiveDemo = () => {
               </div>
             </div>
 
-            {/* Agent feed */}
             <div className="flex flex-col" style={{ height: "520px" }}>
               <div className="px-5 py-3 border-b" style={{ borderColor: "hsl(var(--ghost-border))" }}>
                 <span className="text-sm font-bold">Agent Activity Feed</span>
               </div>
               <AgentActivityFeed agents={agents} />
-              <MemoryTicker />
+              <MemoryTicker memoryItems={memoryItemsForTicker} />
             </div>
           </div>
         </div>

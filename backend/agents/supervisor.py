@@ -258,8 +258,8 @@ Reply with *APPROVE* to execute, *MODIFY* to change parameters, or *REJECT*.
     ) -> Dict[str, Any]:
         """Choose best opportunity using expected value, risk, and user preferences."""
         scored: List[tuple] = []
-        for opp in opportunities:
-            opp_id = opp.get("id", "")
+        for i, opp in enumerate(opportunities):
+            opp_id = opp.get("id") or str(i)
             risk = risk_scores.get(opp_id, 5.0)
             apy = float(opp.get("apy", 0) or 0)
             score = apy * (1 - risk / 10.0)
@@ -331,3 +331,37 @@ Reply with *APPROVE* to execute, *MODIFY* to change parameters, or *REJECT*.
 
         if task_id in self.active_tasks:
             del self.active_tasks[task_id]
+
+    async def learn_from_outcome(
+        self,
+        task_id: str,
+        outcome: Dict[str, Any],
+        task: Dict[str, Any],
+    ) -> None:
+        """Update agent reputations and store warning memories after execution."""
+        opp = None
+        try:
+            recalled = await self.recall_memory(
+                query=f"task {task_id} opportunity",
+                top_k=1,
+                metadata_filter={"task_id": task_id},
+            )
+            if recalled:
+                opp = recalled[0].get("value")
+        except Exception:
+            pass
+        if not outcome.get("success", False) and opp:
+            warning = f"Loss/failure on {opp.get('protocol', 'unknown')} (task {task_id}): {outcome.get('error', 'unknown reason')}"
+            await self.store_memory(
+                key=f"warning_{task_id}",
+                value=warning,
+                metadata={"task_id": task_id, "user_id": task.get("user_id")},
+                memory_type=MEMORY_TYPE_EPISODIC,
+            )
+        # Stub: update agent reputations (would call a reputation service or store)
+        await self._update_agent_reputation(outcome.get("success", False))
+
+    async def _update_agent_reputation(self, success: bool) -> None:
+        """Update contributing agents' reputation based on outcome (stub for future)."""
+        # In full implementation: recall decision metadata, update per-agent scores
+        self.logger.info(f"Reputation update (outcome={'success' if success else 'failure'})")
