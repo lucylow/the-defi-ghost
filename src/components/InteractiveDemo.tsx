@@ -460,7 +460,7 @@ const InteractiveDemo = () => {
                   />
                   <button
                     onClick={() => { if (inputValue.trim()) { runQuery(inputValue.trim()); setInputValue(""); } }}
-                    disabled={isAiStreaming || isRunning || !inputValue.trim()}
+                    disabled={isAiStreaming || isRunning || mock.isRunning || !inputValue.trim()}
                     className="btn-ghost-primary px-4 py-2 rounded-xl text-sm disabled:opacity-50"
                   >
                     {isAiStreaming ? "..." : "Send"}
