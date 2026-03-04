@@ -300,5 +300,3 @@ const Agents = () => (
 );
 
 export default Agents;
-
-export default Agents;
