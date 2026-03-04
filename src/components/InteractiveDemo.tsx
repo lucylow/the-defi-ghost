@@ -471,11 +471,11 @@ const InteractiveDemo = () => {
                   Quick queries:
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {PRESET_QUERIES.map((q) => (
+                  {mockScenarios.map((s) => (
                     <button
-                      key={q}
-                      onClick={() => runQuery(q)}
-                      disabled={isAiStreaming || isRunning}
+                      key={s.id}
+                      onClick={() => { runQuery(s.label); }}
+                      disabled={isAiStreaming || isRunning || mock.isRunning}
                       className="text-xs px-3 py-1.5 rounded-full transition-all disabled:opacity-50"
                       style={{
                         background: "hsl(var(--ghost-cyan) / 0.1)",
@@ -483,7 +483,7 @@ const InteractiveDemo = () => {
                         color: "hsl(var(--ghost-cyan))",
                       }}
                     >
-                      {q}
+                      {s.label}
                     </button>
                   ))}
                 </div>
