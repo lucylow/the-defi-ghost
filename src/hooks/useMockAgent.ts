@@ -41,7 +41,8 @@ export function useMockAgent() {
     setPendingOpp(null);
     setRequiresApproval(false);
 
-    const gen = scenario.run() as AsyncGenerator<AgentActivity[], SupervisorResponse>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gen = scenario.run() as AsyncGenerator<AgentActivity[], any>;
 
     try {
       let result = await gen.next();
