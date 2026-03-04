@@ -76,7 +76,8 @@ export function useMockAgent() {
     setIsRunning(true);
     setRequiresApproval(false);
 
-    const gen = simulateExecution(opp);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gen = simulateExecution(opp) as AsyncGenerator<AgentActivity[], any>;
     try {
       let result = await gen.next();
       while (!result.done) {
