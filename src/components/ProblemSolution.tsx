@@ -1,3 +1,5 @@
+import agentTeamHero from "@/assets/agent-team-hero.png";
+
 const problems = [
   { icon: "⚡", text: "DeFi opportunities vanish in minutes" },
   { icon: "😴", text: "Manual monitoring is impossible 24/7" },
