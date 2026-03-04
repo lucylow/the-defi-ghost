@@ -28,6 +28,22 @@ const ProblemSolution = () => {
           </p>
         </div>
 
+        {/* Agent Team Visual */}
+        <div className="mb-14 rounded-2xl overflow-hidden relative" style={{ border: "1px solid hsl(var(--ghost-cyan) / 0.2)", boxShadow: "0 0 60px hsl(var(--ghost-cyan) / 0.1)" }}>
+          <img
+            src={agentTeamHero}
+            alt="DeFi Ghost multi-agent team orbiting the Supervisor ghost, flying over a neon city"
+            className="w-full object-cover"
+            style={{ maxHeight: "480px", objectPosition: "center top" }}
+          />
+          <div className="absolute inset-0 flex flex-col items-center justify-end pb-8 px-6 text-center" style={{ background: "linear-gradient(to top, hsl(var(--background)) 0%, transparent 50%)" }}>
+            <p className="text-lg font-semibold glow-text mb-1">9 Specialised Agents. One Ghost in Command.</p>
+            <p className="text-sm max-w-lg" style={{ color: "hsl(var(--muted-foreground))" }}>
+              Each agent has a distinct role — Scout finds yield, Analysts debate risk, Governor approves, Executor acts. You stay in control.
+            </p>
+          </div>
+        </div>
+
         <div className="grid md:grid-cols-2 gap-8">
           {/* Problem */}
           <div className="ghost-card p-8 space-y-6" style={{ borderColor: "hsl(0 84% 60% / 0.3)" }}>
