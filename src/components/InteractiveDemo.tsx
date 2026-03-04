@@ -6,6 +6,8 @@ import { AgentActivity, Message } from "./demo/types";
 import { useBackendAvailable, useSendMessage, useSessionMessages, useActivity, useMemory } from "@/hooks/use-defi-ghost-api";
 import type { AgentActivityItem as ApiActivity } from "@/lib/api-types";
 import { useToast } from "@/hooks/use-toast";
+import { useMockAgent } from "@/hooks/useMockAgent";
+import { demoScenarios as mockScenarios } from "@/lib/mockAgentService";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
@@ -113,6 +115,7 @@ function activitiesToAgentFeed(activities: ApiActivity[]): AgentActivity[] {
 
 const InteractiveDemo = () => {
   const { toast } = useToast();
+  const mock = useMockAgent();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "agent",
@@ -261,14 +264,24 @@ const InteractiveDemo = () => {
     );
   };
 
+  // Sync mock supervisor messages into chat
+  useEffect(() => {
+    if (!mock.supervisorMsg) return;
+    const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    setMessages((prev) => [...prev, { role: "agent", text: mock.supervisorMsg, timestamp: ts }]);
+    if (mock.requiresApproval) setShowApprove(true);
+    scrollToBottom();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mock.supervisorMsg]);
+
   const runQuery = (query: string) => {
-    // If AI is available (Supabase connected), use real AI
+    // Real AI path (Supabase connected)
     if (SUPABASE_URL) {
       sendAiMessage(query);
       return;
     }
 
-    if (isRunning) return;
+    if (isRunning || mock.isRunning) return;
 
     const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     setMessages((prev) => [...prev, { role: "user", text: query, timestamp: now }]);
@@ -282,45 +295,18 @@ const InteractiveDemo = () => {
       sendMessageMutation.mutate(
         { text: query },
         {
-          onSuccess: (data) => {
-            setSessionId(data.session_id);
-          },
-          onSettled: () => {
-            setTimeout(() => setIsRunning(false), 30000);
-          },
+          onSuccess: (data) => { setSessionId(data.session_id); },
+          onSettled: () => { setTimeout(() => setIsRunning(false), 30000); },
         }
       );
       return;
     }
 
-    // Demo mode: simulated flow
-    setIsRunning(true);
+    // Mock agent service path — match query to scenario by label or default to first
     setShowApprove(false);
     setApproved(false);
-    clearTimeouts();
-
-    const flow = DEMO_FLOWS[query] ?? DEMO_FLOWS["Find me the best yield for 5,000 USDC"];
-    setAgents(initialAgents.map((a) => ({ ...a, status: "waiting" })));
-
-    flow.agents.forEach(({ delay, index, status, message }) => {
-      const t = setTimeout(() => {
-        setAgents((prev) => prev.map((a, i) => (i === index ? { ...a, status, message } : a)));
-      }, delay);
-      timeoutsRef.current.push(t);
-    });
-
-    flow.messages.forEach(({ delay, text, role }) => {
-      const t = setTimeout(() => {
-        const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        setMessages((prev) => [...prev, { role, text, timestamp: ts }]);
-        if (role === "agent" && text.includes("Shall I prepare")) setShowApprove(true);
-        scrollToBottom();
-      }, delay);
-      timeoutsRef.current.push(t);
-    });
-
-    const lastDelay = Math.max(...flow.messages.map((m) => m.delay)) + 500;
-    timeoutsRef.current.push(setTimeout(() => setIsRunning(false), lastDelay));
+    const scenario = mockScenarios.find((s) => s.label === query || s.query === query) ?? mockScenarios[0];
+    mock.runScenario(scenario.id);
   };
 
   const handleApprove = () => {
@@ -336,43 +322,37 @@ const InteractiveDemo = () => {
 
     if (isLiveMode) {
       runQuery("Approve");
-      setAgents((prev) =>
-        prev.map((a, i) => (i === 0 ? { ...a, status: "active", message: "Planning bridge + deposit..." } : a))
-      );
+      setAgents((prev) => prev.map((a, i) => (i === 0 ? { ...a, status: "active", message: "Planning bridge + deposit..." } : a)));
       setTimeout(() => {
-        setAgents((prev) =>
-          prev.map((a, i) => (i === 0 ? { ...a, status: "done", message: "Strategy plan complete ✅" } : a))
-        );
+        setAgents((prev) => prev.map((a, i) => (i === 0 ? { ...a, status: "done", message: "Strategy plan complete ✅" } : a)));
       }, 2500);
       return;
     }
 
-    setAgents((prev) =>
-      prev.map((a, i) => (i === 0 ? { ...a, status: "active", message: "Planning bridge + deposit..." } : a))
-    );
-    setTimeout(() => {
-      const ts2 = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "agent",
-          text: "🔐 Transaction prepared and secured. **Please sign with your wallet to execute.** (Simulated — no real transaction)",
-          timestamp: ts2,
-        },
-      ]);
-      setAgents((prev) =>
-        prev.map((a, i) => (i === 0 ? { ...a, status: "done", message: "Strategy plan complete ✅" } : a))
-      );
-      scrollToBottom();
-    }, 2500);
+    // Mock execution
+    mock.sendApproval(true);
   };
+
+  // Sync mock activities → agent panel (when not in AI/live mode)
+  useEffect(() => {
+    if (SUPABASE_URL || isLiveMode || !mock.activities.length) return;
+    const roleToSlot: Record<string, number> = {
+      supervisor: 0, 'market-analyst-bull': 1, 'market-analyst-bear': 2,
+      'opportunity-scout': 3, 'gas-analyst': 4, 'risk-governor': 5,
+    };
+    setAgents(initialAgents.map((base, i) => {
+      const last = [...mock.activities].reverse().find((a) => roleToSlot[a.agentId] === i);
+      if (last) return { ...base, status: "active" as const, message: last.message };
+      return { ...base, status: "waiting" as const };
+    }));
+  }, [mock.activities, isLiveMode]);
 
   const memoryItemsForTicker = isLiveMode && memoryData?.items?.length
     ? memoryData.items.map((m) => {
         const v = typeof m.value === "string" ? m.value : JSON.stringify(m.value);
         return v.length > 60 ? v.slice(0, 57) + "..." : v;
       })
-    : undefined;
+    : mock.memoryItems;
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -480,7 +460,7 @@ const InteractiveDemo = () => {
                   />
                   <button
                     onClick={() => { if (inputValue.trim()) { runQuery(inputValue.trim()); setInputValue(""); } }}
-                    disabled={isAiStreaming || isRunning || !inputValue.trim()}
+                    disabled={isAiStreaming || isRunning || mock.isRunning || !inputValue.trim()}
                     className="btn-ghost-primary px-4 py-2 rounded-xl text-sm disabled:opacity-50"
                   >
                     {isAiStreaming ? "..." : "Send"}
@@ -491,11 +471,11 @@ const InteractiveDemo = () => {
                   Quick queries:
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {PRESET_QUERIES.map((q) => (
+                  {mockScenarios.map((s) => (
                     <button
-                      key={q}
-                      onClick={() => runQuery(q)}
-                      disabled={isAiStreaming || isRunning}
+                      key={s.id}
+                      onClick={() => { runQuery(s.label); }}
+                      disabled={isAiStreaming || isRunning || mock.isRunning}
                       className="text-xs px-3 py-1.5 rounded-full transition-all disabled:opacity-50"
                       style={{
                         background: "hsl(var(--ghost-cyan) / 0.1)",
@@ -503,7 +483,7 @@ const InteractiveDemo = () => {
                         color: "hsl(var(--ghost-cyan))",
                       }}
                     >
-                      {q}
+                      {s.label}
                     </button>
                   ))}
                 </div>
