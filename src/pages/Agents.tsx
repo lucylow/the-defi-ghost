@@ -176,6 +176,123 @@ const Agents = () => (
             </div>
           ))}
         </div>
+
+        {/* Human-in-the-Loop Section */}
+        <div className="mt-20">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-3">
+              <span className="glow-text">Human-in-the-Loop</span> Framework
+            </h2>
+            <p className="text-lg max-w-2xl mx-auto" style={{ color: "hsl(var(--muted-foreground))" }}>
+              Full autonomy without human oversight is dangerous in finance. DeFi Ghost keeps you in control at every critical juncture.
+            </p>
+          </div>
+
+          {/* Progressive Autonomy */}
+          <div className="ghost-card rounded-2xl p-8 mb-8">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span>🎚️</span> Progressive Autonomy Model
+            </h3>
+            <div className="grid md:grid-cols-3 gap-6">
+              {[
+                { label: "New User", desc: "Maximum oversight — every action requires explicit approval.", icon: "🔒", color: "hsl(0 70% 55%)" },
+                { label: "Trusted User", desc: "Configurable autonomy — auto-approve trades under your set limit.", icon: "⚖️", color: "hsl(40 100% 60%)" },
+                { label: "Power User", desc: "Granular permissions — trust specific protocols and chains fully.", icon: "🚀", color: "hsl(145 70% 50%)" },
+              ].map((tier) => (
+                <div key={tier.label} className="rounded-xl p-5" style={{ background: `${tier.color}11`, border: `1px solid ${tier.color}33` }}>
+                  <div className="text-2xl mb-2">{tier.icon}</div>
+                  <div className="font-bold mb-1" style={{ color: tier.color }}>{tier.label}</div>
+                  <p className="text-sm" style={{ color: "hsl(var(--muted-foreground))" }}>{tier.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Intervention Points */}
+          <div className="ghost-card rounded-2xl p-8 mb-8">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span>🛑</span> Critical Intervention Points
+            </h3>
+            <div className="space-y-4">
+              {[
+                { step: "01", title: "Configuration Phase", desc: "Before any agent acts, you set your risk profile, maximum allocation per protocol, blacklisted protocols, and auto-approval thresholds.", icon: "⚙️" },
+                { step: "02", title: "Pre-Execution Approval", desc: "For every significant transaction the Supervisor pauses and sends you the full opportunity brief — protocol, APY, gas estimate, and risk score — before proceeding.", icon: "✋" },
+                { step: "03", title: "Parameter Modification", desc: 'You\'re not limited to approve/reject. Reply "MODIFY amount to 2000 USDC" and the system updates the plan and confirms before executing.', icon: "✏️" },
+                { step: "04", title: "Emergency Stop", desc: 'Type "STOP ALL" at any time to instantly cancel all pending tasks, revoke temporary session keys, and put the Ghost into idle mode.', icon: "🛑" },
+              ].map((point) => (
+                <div key={point.step} className="flex gap-4 p-4 rounded-xl" style={{ background: "hsl(var(--secondary) / 0.3)" }}>
+                  <div className="text-2xl flex-shrink-0">{point.icon}</div>
+                  <div>
+                    <div className="font-semibold mb-1">{point.title} <span className="text-xs font-mono ml-2" style={{ color: "hsl(var(--muted-foreground))" }}>Step {point.step}</span></div>
+                    <p className="text-sm" style={{ color: "hsl(var(--muted-foreground))" }}>{point.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Comparison Table */}
+          <div className="ghost-card rounded-2xl p-8 mb-8">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span>📊</span> How DeFi Ghost Compares
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ borderBottom: "1px solid hsl(var(--ghost-border))" }}>
+                    <th className="text-left py-3 pr-6 font-semibold">Feature</th>
+                    <th className="text-center py-3 px-4 font-semibold" style={{ color: "hsl(var(--ghost-cyan))" }}>DeFi Ghost</th>
+                    <th className="text-center py-3 px-4 font-semibold" style={{ color: "hsl(var(--muted-foreground))" }}>Yield Bots</th>
+                    <th className="text-center py-3 px-4 font-semibold" style={{ color: "hsl(var(--muted-foreground))" }}>Manual</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ["24/7 Monitoring", "✅", "✅", "❌"],
+                    ["Execution", "After approval", "Automatic", "Manual"],
+                    ["Risk Assessment", "Multi-agent validation", "Basic or none", "User's own"],
+                    ["Learning", "Learns from decisions", "Static rules", "User learns"],
+                    ["Emergency Stop", "Instant via message", "Often none", "N/A"],
+                    ["Transparency", "Full audit trail", "Black box", "User knows own"],
+                  ].map(([feature, ghost, bots, manual]) => (
+                    <tr key={feature} style={{ borderBottom: "1px solid hsl(var(--ghost-border) / 0.4)" }}>
+                      <td className="py-3 pr-6 font-medium">{feature}</td>
+                      <td className="text-center py-3 px-4" style={{ color: "hsl(var(--ghost-cyan))" }}>{ghost}</td>
+                      <td className="text-center py-3 px-4" style={{ color: "hsl(var(--muted-foreground))" }}>{bots}</td>
+                      <td className="text-center py-3 px-4" style={{ color: "hsl(var(--muted-foreground))" }}>{manual}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Audit Trail */}
+          <div className="ghost-card rounded-2xl p-8">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <span>📋</span> Full Audit Trail & Explainability
+            </h3>
+            <p className="text-sm mb-6" style={{ color: "hsl(var(--muted-foreground))" }}>
+              Every decision is logged with complete context — which agents recommended what, why, and what the outcome was. Nothing is a black box.
+            </p>
+            <div className="grid md:grid-cols-2 gap-4">
+              {[
+                { icon: "🐂", label: "Bull Analysis", desc: "Bullish case with trend data and APY projections" },
+                { icon: "🐻", label: "Bear Analysis", desc: "Risk flags, utilisation warnings, downside scenarios" },
+                { icon: "🛡️", label: "Risk Governor", desc: "Final risk score and approval rationale" },
+                { icon: "🧠", label: "Memory Context", desc: "Recalled past trades and user preference patterns" },
+              ].map((item) => (
+                <div key={item.label} className="flex gap-3 p-3 rounded-lg" style={{ background: "hsl(var(--secondary) / 0.3)" }}>
+                  <span className="text-xl">{item.icon}</span>
+                  <div>
+                    <div className="font-medium text-sm">{item.label}</div>
+                    <div className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>{item.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <GhostFooter />
