@@ -6,6 +6,8 @@ import { AgentActivity, Message } from "./demo/types";
 import { useBackendAvailable, useSendMessage, useSessionMessages, useActivity, useMemory } from "@/hooks/use-defi-ghost-api";
 import type { AgentActivityItem as ApiActivity } from "@/lib/api-types";
 import { useToast } from "@/hooks/use-toast";
+import { useMockAgent } from "@/hooks/useMockAgent";
+import { demoScenarios as mockScenarios } from "@/lib/mockAgentService";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 
