@@ -115,6 +115,7 @@ function activitiesToAgentFeed(activities: ApiActivity[]): AgentActivity[] {
 
 const InteractiveDemo = () => {
   const { toast } = useToast();
+  const mock = useMockAgent();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "agent",
