@@ -498,48 +498,80 @@ const InteractiveDemo = () => {
                     onKeyDown={handleInputKeyDown}
                     placeholder="Ask Ghost anything about DeFi..."
                     disabled={isAiStreaming || isRunning}
-                    className="flex-1 px-3 py-2 rounded-xl text-sm bg-transparent outline-none disabled:opacity-50"
+                    className="flex-1 px-3 py-2 rounded-xl text-sm outline-none disabled:opacity-50 transition-all focus:ring-1"
                     style={{
                       background: "hsl(var(--secondary))",
                       border: "1px solid hsl(var(--ghost-border))",
                       color: "hsl(var(--foreground))",
                     }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "hsl(var(--ghost-cyan) / 0.6)"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "hsl(var(--ghost-border))"; }}
                   />
-                  <button
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => { if (inputValue.trim()) { runQuery(inputValue.trim()); setInputValue(""); } }}
                     disabled={isAiStreaming || isRunning || mock.isRunning || !inputValue.trim()}
-                    className="btn-ghost-primary px-4 py-2 rounded-xl text-sm disabled:opacity-50"
+                    className="btn-ghost-primary px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-40"
                   >
-                    {isAiStreaming ? "..." : "Send"}
-                  </button>
+                    {isAiStreaming ? (
+                      <span className="flex items-center gap-1.5">
+                        <motion.span animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="block w-3 h-3 border-2 border-current border-t-transparent rounded-full" />
+                        Thinking
+                      </span>
+                    ) : "Send ↑"}
+                  </motion.button>
                 </div>
 
                 <p className="text-xs font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>
-                  Quick queries:
+                  ⚡ Quick queries:
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {mockScenarios.map((s) => (
-                    <button
+                    <motion.button
                       key={s.id}
+                      whileHover={{ scale: 1.04 }}
+                      whileTap={{ scale: 0.96 }}
                       onClick={() => { runQuery(s.label); }}
                       disabled={isAiStreaming || isRunning || mock.isRunning}
-                      className="text-xs px-3 py-1.5 rounded-full transition-all disabled:opacity-50"
+                      className="text-xs px-3 py-1.5 rounded-full transition-colors disabled:opacity-40"
                       style={{
-                        background: "hsl(var(--ghost-cyan) / 0.1)",
-                        border: "1px solid hsl(var(--ghost-cyan) / 0.25)",
+                        background: "hsl(var(--ghost-cyan) / 0.08)",
+                        border: "1px solid hsl(var(--ghost-cyan) / 0.3)",
                         color: "hsl(var(--ghost-cyan))",
                       }}
                     >
                       {s.label}
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               </div>
             </div>
 
             <div className="flex flex-col" style={{ height: "520px" }}>
-              <div className="px-5 py-3 border-b" style={{ borderColor: "hsl(var(--ghost-border))" }}>
+              <div
+                className="px-5 py-3 border-b flex items-center justify-between"
+                style={{ borderColor: "hsl(var(--ghost-border))" }}
+              >
                 <span className="text-sm font-bold">Agent Activity Feed</span>
+                <AnimatePresence>
+                  {(mock.isRunning || isAiStreaming) && (
+                    <motion.span
+                      initial={{ opacity: 0, x: 6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 6 }}
+                      className="text-xs font-mono flex items-center gap-1.5"
+                      style={{ color: "hsl(var(--ghost-cyan))" }}
+                    >
+                      <motion.span
+                        animate={{ opacity: [1, 0.3, 1] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                        className="block w-1.5 h-1.5 rounded-full"
+                        style={{ background: "hsl(var(--ghost-cyan))" }}
+                      />
+                      LIVE
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </div>
               <AgentActivityFeed agents={agents} />
               <MemoryTicker memoryItems={memoryItemsForTicker} />
