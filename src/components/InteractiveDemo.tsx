@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import AgentActivityFeed from "./demo/AgentActivityFeed";
 import MemoryTicker from "./demo/MemoryTicker";
 import { PRESET_QUERIES, DEMO_FLOWS, initialAgents } from "./demo/demoScenarios";
