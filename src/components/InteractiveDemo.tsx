@@ -403,41 +403,87 @@ const InteractiveDemo = () => {
 
           <div className="grid lg:grid-cols-2 divide-x" style={{ borderColor: "hsl(var(--ghost-border))" }}>
             <div className="flex flex-col" style={{ height: "520px" }}>
-              <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                {messages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className="max-w-xs lg:max-w-sm px-4 py-3 rounded-2xl text-sm leading-relaxed space-y-1"
-                      style={
-                        msg.role === "user"
-                          ? {
-                              background: "hsl(var(--ghost-cyan) / 0.2)",
-                              border: "1px solid hsl(var(--ghost-cyan) / 0.3)",
-                              color: "hsl(var(--foreground))",
-                              borderRadius: "18px 18px 4px 18px",
-                            }
-                          : {
-                              background: "hsl(var(--secondary))",
-                              border: "1px solid hsl(var(--ghost-border))",
-                              color: "hsl(var(--foreground))",
-                              borderRadius: "18px 18px 18px 4px",
-                            }
-                      }
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin">
+                <AnimatePresence initial={false}>
+                  {messages.map((msg, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 10, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.28, ease: "easeOut" }}
+                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                     >
-                      {formatMessage(msg.text)}
-                      <div className="text-xs mt-1" style={{ color: "hsl(var(--muted-foreground))" }}>
-                        {msg.timestamp}
+                      <div
+                        className="max-w-xs lg:max-w-sm px-4 py-3 text-sm leading-relaxed space-y-1"
+                        style={
+                          msg.role === "user"
+                            ? {
+                                background: "hsl(var(--ghost-cyan) / 0.15)",
+                                border: "1px solid hsl(var(--ghost-cyan) / 0.35)",
+                                color: "hsl(var(--foreground))",
+                                borderRadius: "18px 18px 4px 18px",
+                              }
+                            : {
+                                background: "hsl(var(--secondary))",
+                                border: "1px solid hsl(var(--ghost-border))",
+                                color: "hsl(var(--foreground))",
+                                borderRadius: "18px 18px 18px 4px",
+                              }
+                        }
+                      >
+                        {formatMessage(msg.text)}
+                        <div className="text-xs mt-1" style={{ color: "hsl(var(--muted-foreground))" }}>
+                          {msg.timestamp}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+
+                {/* Typing indicator */}
+                <AnimatePresence>
+                  {(isAiStreaming || mock.isRunning) && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 6 }}
+                      className="flex justify-start"
+                    >
+                      <div
+                        className="px-4 py-3 text-sm"
+                        style={{
+                          background: "hsl(var(--secondary))",
+                          border: "1px solid hsl(var(--ghost-border))",
+                          borderRadius: "18px 18px 18px 4px",
+                        }}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {[0, 0.2, 0.4].map((delay, k) => (
+                            <motion.span
+                              key={k}
+                              animate={{ y: [0, -5, 0] }}
+                              transition={{ duration: 0.8, repeat: Infinity, delay, ease: "easeInOut" }}
+                              className="block w-2 h-2 rounded-full"
+                              style={{ background: "hsl(var(--ghost-cyan))" }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 {showApprove && !approved && (
-                  <div className="flex justify-end gap-3">
-                    <button onClick={handleApprove} className="btn-ghost-primary px-4 py-2 rounded-xl text-sm">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex justify-end gap-3"
+                  >
+                    <button onClick={handleApprove} className="btn-ghost-primary px-4 py-2 rounded-xl text-sm font-semibold">
                       ✅ Approve
                     </button>
-                    <button className="btn-ghost-outline px-4 py-2 rounded-xl text-sm">❌ Decline</button>
-                  </div>
+                    <button className="btn-ghost-outline px-4 py-2 rounded-xl text-sm font-semibold">❌ Decline</button>
+                  </motion.div>
                 )}
                 <div ref={chatEndRef} />
               </div>
